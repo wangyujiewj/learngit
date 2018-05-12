@@ -115,9 +115,9 @@ public class NavigationActivity extends AppCompatActivity implements  LocationSo
      */
     private List<NaviLatLng> startList = new ArrayList<NaviLatLng>();
     /**
-     * 途径点坐标集合
+     * 存起点
      */
-    private List<NaviLatLng> wayList = new ArrayList<NaviLatLng>();
+    private List<NaviLatLng> finalList = new ArrayList<NaviLatLng>();
     /**
      * 终点坐标集合［建议就一个终点］
      */
@@ -140,7 +140,7 @@ public class NavigationActivity extends AppCompatActivity implements  LocationSo
         setContentView(R.layout.activity_navigation);
 
         mKqwSpeechCompound = new KqwSpeechCompound(this);//语音合成对象
-        new Thread(networkTask).start();//创建一个新的socket线程
+       // new Thread(networkTask).start();//创建一个新的socket线程
 
         Log.v("===","xxxx");
         ActionBar actionBar = getSupportActionBar();
@@ -167,6 +167,7 @@ public class NavigationActivity extends AppCompatActivity implements  LocationSo
         });
     }
     //socket通信
+
     Runnable networkTask = new Runnable() {
         @Override
         public void run() {
@@ -199,7 +200,7 @@ public class NavigationActivity extends AppCompatActivity implements  LocationSo
 
     private void Speech() {
         Intent intent = new Intent(this,SearchPoiActivity.class);//拾取终点坐标点
-        startActivityForResult(intent, REQUEST_CODE);
+        startActivityForResult(intent, REQUEST_CODE);//resquestcode只是一个标识
 
         endList.clear();
     }
@@ -214,7 +215,7 @@ public class NavigationActivity extends AppCompatActivity implements  LocationSo
     private void initView() {
         mapview = (MapView) findViewById(R.id.navi_view);
         mRecyclerView = (RecyclerView) findViewById(R.id.rl_rlv_ways);
-        mRecyclerView.setLayoutManager(new GridLayoutManager(this,3));
+        mRecyclerView.setLayoutManager(new GridLayoutManager(this, 3));
         mAdapter = getAdapter();
         mRecyclerView.setAdapter(mAdapter);
         oneWay = (RelativeLayout) findViewById(R.id.ll_rl_1way);
@@ -231,39 +232,10 @@ public class NavigationActivity extends AppCompatActivity implements  LocationSo
         tvStart = (TextView) findViewById(R.id.rl_tv_start);
         tvEnd = (TextView) findViewById(R.id.rl_tv_end);
         tvNavi = (TextView) findViewById(R.id.rl_tv_navistart);
-       // tvNavi.setOnClickListener(this);
+        // tvNavi.setOnClickListener(this);
         //tvEnd.setOnClickListener(this);  //输入终点
-
-        //添加Tab点击事件
-        /*
-        mTabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
-            @Override
-            public void onTabSelected(TabLayout.Tab tab) {
-                String tabName = tab.getText().toString();
-                if(tabName.equals("驾车")){
-                    navigationType = 0;
-                 if(tabName.equals("步行")){
-                    navigationType = 1;
-                }else{
-                    navigationType = 2;
-                }
-                clearRoute();
-                planRoute();
-
-            }
-
-            @Override
-            public void onTabUnselected(TabLayout.Tab tab) {
-
-           }
-
-            @Override
-            public void onTabReselected(TabLayout.Tab tab) {
-
-            }
-        });
-*/
     }
+
 
     /**
      * 初始化AMap对象
@@ -274,8 +246,10 @@ public class NavigationActivity extends AppCompatActivity implements  LocationSo
             //设置显示定位按钮 并且可以点击
             UiSettings settings = amap.getUiSettings();
             amap.setLocationSource(this);//设置了定位的监听,这里要实现LocationSource接口
+
             // 是否显示定位按钮
             settings.setMyLocationButtonEnabled(true);
+            settings.setAllGesturesEnabled(false);//设置所有手势不可用
             amap.setMyLocationEnabled(true);//显示定位层并且可以触发定位,默认是flase
             mAMapNavi = AMapNavi.getInstance(getApplicationContext());
             mAMapNavi.addAMapNaviListener(this);
@@ -284,18 +258,6 @@ public class NavigationActivity extends AppCompatActivity implements  LocationSo
         }
     }
 
-   /* @Override
-    public void onClick(View v) {
-        switch (v.getId()) {
-            case R.id.rl_tv_end:
-                Intent intent = new Intent(this, SearchPoiActivity.class);//拾取终点坐标点
-                startActivityForResult(intent, REQUEST_CODE);
-                endList.clear();
-                break;
-            case R.id.rl_tv_navistart:
-                clickNavigation();
-        }
-    }*/
 
 
 
@@ -392,7 +354,7 @@ public class NavigationActivity extends AppCompatActivity implements  LocationSo
             }
         } else if (resultCode == RESULT_CODE_KEYWORDS && data != null) {
             amap.clear();
-            String keywords = data.getStringExtra(Constants.KEY_WORDS_NAME);
+            String keywords = data.getStringExtra(Constants.KEY_WORDS_NAME);//通过key_words_name这个标识来获取跳转过来的activity里的数据
             if(keywords != null && !keywords.equals("")){
                 doSearchQuery(keywords);
             }
@@ -401,6 +363,12 @@ public class NavigationActivity extends AppCompatActivity implements  LocationSo
     //          mCleanKeyWords.setVisibility(View.VISIBLE);
             }
         }
+        else if(resultCode == 1&&data==null)
+        {
+            endList.add(finalList.get(0));
+            planRoute();//路线规划
+        }
+
     }
     /**
      * 用marker展示输入提示list选中数据
@@ -576,40 +544,9 @@ public class NavigationActivity extends AppCompatActivity implements  LocationSo
      * 路线规划
      */
     private void planRoute() {
-       // mRecyclerView.setVisibility(View.GONE);//多条路线规划结果
         oneWay.setVisibility(View.GONE);//一条路线规划结果
         if(startList.size()>0 && endList.size()>0){
-            //if(navigationType == 0){//驾车
-            //    int strategy=0;
-            //    try {
-                    /**
-                     * 方法:
-                     *   int strategy=mAMapNavi.strategyConvert(congestion, avoidhightspeed, cost, hightspeed, multipleroute);
-                     * 参数:
-                     * @congestion 躲避拥堵
-                     * @avoidhightspeed 不走高速
-                     * @cost 避免收费
-                     * @hightspeed 高速优先
-                     * @multipleroute 多路径
-                     *
-                     * 说明:
-                     *      以上参数都是boolean类型，其中multipleroute参数表示是否多条路线，如果为true则此策略会算出多条路线。
-                     * 注意:
-                     *      不走高速与高速优先不能同时为true
-                     *      高速优先与避免收费不能同时为true
-                     */
-                 //   strategy = mAMapNavi.strategyConvert(true, false, false, true, true);
-              //  } catch (Exception e) {
-              //      e.printStackTrace();
-          //      }
-                //mAMapNavi.calculateDriveRoute(startList, endList, wayList, strategy);
-             //步行
-
-
                     mAMapNavi.calculateWalkRoute(startList.get(0), endList.get(0));//起点坐标  终点坐标
-       //         else{//骑行
-       //         mAMapNavi.calculateRideRoute(startList.get(0), endList.get(0));
-      //      }
         }
     }
 
@@ -804,6 +741,7 @@ public class NavigationActivity extends AppCompatActivity implements  LocationSo
                     &&amapLocation.getErrorCode() == 0) {
                 if(startList.size()==0)
                     startList.add(new NaviLatLng(amapLocation.getLatitude(),amapLocation.getLongitude()));
+                    finalList.add(new NaviLatLng(amapLocation.getLatitude(),amapLocation.getLongitude()));
                 if(!calculateSuccess){
                     mListener.onLocationChanged(amapLocation);// 显示系统小蓝点
                 }
@@ -845,12 +783,7 @@ public class NavigationActivity extends AppCompatActivity implements  LocationSo
      */
 
     public void deactivate() {
- //       mListener = null;
-   //     if (mlocationClient != null) {
-     //       mlocationClient.stopLocation();
-     //       mlocationClient.onDestroy();
-    //    }
-     //   mlocationClient = null;
+
     }
 
     /**
@@ -1041,8 +974,11 @@ public class NavigationActivity extends AppCompatActivity implements  LocationSo
         tvLength.setText(getLength(path.getAllLength()));
         tvNavi.setText("开始导航");
         mAMapNavi.selectRouteId(routeOverlays.keyAt(routeIndex));//取消开始导航的button直接进入导航
-        Intent gpsintent = new Intent(this, WalikingNavi.class);
-        startActivity(gpsintent);
+        Intent intent = new Intent(this, WalikingNavi.class);
+        startActivityForResult(intent,0);
+        finish();
+
+
     }
 
 

@@ -1,6 +1,7 @@
 package com.example.acer.gesture;
 
 import android.app.Application;
+import android.content.Context;
 import android.widget.Toast;
 
 import com.iflytek.cloud.SpeechConstant;
@@ -15,12 +16,15 @@ import java.net.Socket;
 
 public class InitApplication extends Application {
     Socket socket = null;
+
+     int flag=2;
     public Socket getSocket(){
         return socket;
     }
     public void setSocket(Socket socket){
         this.socket = socket;
     }
+
     public void onCreate() {
         Toast.makeText(this, "InitApplication", Toast.LENGTH_LONG).show();
         // 应用程序入口处调用,避免手机内存过小,杀死后台进程后通过历史intent进入Activity造成SpeechUtility对象为null

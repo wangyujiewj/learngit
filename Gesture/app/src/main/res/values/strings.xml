@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">MyMap</string>
+    <string name="app_name">第一公里--智能助盲设备</string>
     <string name="loading">正在加载…</string>
     <string name="no_location">附近没有其它地点</string>
     <string name="map_pick">地图选点</string>

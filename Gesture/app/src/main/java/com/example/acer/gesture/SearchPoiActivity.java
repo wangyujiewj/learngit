@@ -55,9 +55,15 @@ public class SearchPoiActivity extends Activity implements AdapterView.OnItemCli
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_poi_key_search);
-        soundPool= new SoundPool(10, AudioManager.STREAM_MUSIC,100);
-        soundPool.load(this,R.raw.collide,1);
-        soundPool.play(1,1,1,0,0,1);
+        soundPool= new SoundPool(5, AudioManager.STREAM_ALARM,5);
+        final int soundID=soundPool.load(this,R.raw.collide,1);
+        soundPool.setOnLoadCompleteListener(new SoundPool.OnLoadCompleteListener() {
+            @Override
+            public void onLoadComplete(SoundPool soundPool, int sampleId, int status) {
+                soundPool.play(soundID, 0.6f, 0.6f, 1, 0, 1);
+            }
+        });
+
         SpeechUtility.createUtility(this, SpeechConstant.APPID + "=5a9f54c8");
         initSearchView();
         mInputListView = (ListView) findViewById(R.id.inputtip_list);
@@ -85,8 +91,8 @@ public class SearchPoiActivity extends Activity implements AdapterView.OnItemCli
                     //解析语音
                      result = parseVoice(recognizerResult.getResultString());
                     Intent intent = new Intent();
-                    intent.putExtra(Constants.KEY_WORDS_NAME, result);
-                    setResult(NavigationActivity.RESULT_CODE_KEYWORDS, intent);
+                    intent.putExtra(Constants.KEY_WORDS_NAME, result);//key-value对
+                    setResult(NavigationActivity.RESULT_CODE_KEYWORDS, intent);//result_code_keywords同样是用来标识的  回复码
                     finish();
                 }
 

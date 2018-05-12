@@ -35,8 +35,13 @@ import com.iflytek.cloud.RecognizerResult;
 import com.iflytek.cloud.SpeechConstant;
 
 import java.io.OutputStreamWriter;
+import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.net.CacheRequest;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.Set;
 import android.bluetooth.*;
 import com.iflytek.cloud.SpeechError;
@@ -45,6 +50,8 @@ import java.util.List;
 import android.widget.ListView;
 import com.iflytek.cloud.ui.RecognizerDialog;
 import com.iflytek.cloud.ui.RecognizerDialogListener;
+
+import java.util.Timer;
 import java.util.UUID;
 import android.widget.Toast;
 import java.util.ArrayList;
@@ -56,13 +63,20 @@ import java.util.UUID;
 public class MainActivity extends AppCompatActivity implements INaviInfoCallback {
 
     private GestureDetector mGestureDetector;
-    static final String host = "192.168.1.112";//我自己的ip 改成你自己的
-    private String text = "请注意，前方有障碍物";//超声波检测到障碍的语音提示
+    private InitApplication mAppInstance;
+    private String s1="";//将传来的字节转化成字符串
+    //static final String host = "192.168.43.56";//我自己的ip 改成你自己的
+    private final String text = "请注意，前方有障碍物";//超声波检测到障碍的语音提示
      KqwSpeechCompound mKqwSpeechCompound;
-    static final int port = 9002;//python的port要和这个一致
-    Socket socket = null;
-    BufferedReader in = null;
-    BufferedWriter out = null;
+    static final int port = 9995;//python的port要和这个一致
+    //Socket socket = null;
+    //BufferedReader in = null;
+    //BufferedWriter out = null;
+    private Date now;
+    private long between ;
+
+    private String ReceiveData = "";
+
     private static final UUID MY_UUID =
             UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");//蓝牙通用串口不用改
 
@@ -75,7 +89,7 @@ public class MainActivity extends AppCompatActivity implements INaviInfoCallback
     private OutputStream outStream = null;
 
     private InputStream inStream = null;
-    private BluetoothAdapter mBluetoothAdapter = null;//蓝牙适配器
+      BluetoothAdapter mBluetoothAdapter = null;//蓝牙适配器
 
 
 
@@ -83,12 +97,13 @@ public class MainActivity extends AppCompatActivity implements INaviInfoCallback
     protected void onCreate(Bundle savedInstanceState) {
         // TODO Auto-generated method stub
         super.onCreate(savedInstanceState);
-
-
+        setContentView(R.layout.activity_main);
+        mAppInstance = (InitApplication)getApplication();
         mKqwSpeechCompound = new KqwSpeechCompound(this);//语音合成对象
         new Thread(networkTask).start();//开启socket通信（pc端）线程
 
         InitBluetooth();
+        //flag =  mBluetoothAdapter.getState();
         //handler = new MyHandler();
 
         //判断蓝牙是否打开
@@ -124,7 +139,10 @@ public class MainActivity extends AppCompatActivity implements INaviInfoCallback
     {
         //得到一个蓝牙适配器
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+
+
         if(mBluetoothAdapter == null) {
+            mAppInstance.flag=0;
             finish();
             return;
         }
@@ -242,36 +260,44 @@ public class MainActivity extends AppCompatActivity implements INaviInfoCallback
     class ReceiveThread extends Thread
     {
 
-        String buffer="";
-
         @Override
         public void run() {
 
-            while(btSocket!=null )
+            while (btSocket != null)//一个接受信息的循环
             {
+
                 //定义一个存储空间buff
-                byte[] buff=new byte[1024];
+                byte[] buff = new byte[1024];
                 try {
                     inStream = btSocket.getInputStream();
+
                     System.out.println("waitting for instream");
+
                     inStream.read(buff); //读取数据存储在buff数组中
-//                        System.out.println("buff receive :"+buff.length);
-
-                    // ReceiveData = new String(buff,0,inStream.available());
-                    //ReceiveData = new String(buff,"ASCII");
-
-                    processBuffer(buff,1024);
+//
+                    try {
+                        processBuffer(buff, 1024);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
 
                     //System.out.println("receive content:"+ReceiveData);
                 } catch (IOException e) {
-
-                    e.printStackTrace();
+                    try{
+                        mKqwSpeechCompound.speaking("超声波已断开");
+                        Thread.sleep(3500);
+                    }catch (Exception ae){
+                        ae.printStackTrace();
+                    }
+                    System.out.println("123456789123456789");
+                    e.printStackTrace();//当try中语句出现异常时，会执行catch语句，在命令行打印异常信息在程序中出错的位置及原因
+                    break;
                 }
+
             }
         }
 
-        private void processBuffer(byte[] buff,int size)
-        {
+        private void processBuffer(byte[] buff,int size) throws InterruptedException {
             int length=0;
             for(int i=0;i<size;i++)
             {
@@ -294,13 +320,20 @@ public class MainActivity extends AppCompatActivity implements INaviInfoCallback
             {
                 newbuff[j]=buff[j];
             }
-
-
-
-            if(buff.length>0)
+//            ReceiveData = ReceiveData + new String(newbuff);
+//            if (ReceiveData == "")
+//                mKqwSpeechCompound.speaking("超声波传感器断开连接".trim());
+//            for(int i = 0; i<ReceiveData.length(); i++)
+//            {
+//                if (newbuff[i] >= 49)
+//                    mKqwSpeechCompound.speaking(text.trim());
+//
+//            }
+            s1=s1+new String(newbuff);
+            if(s1.length()>0)
             {
-
                 mKqwSpeechCompound.speaking(text.trim());
+                Thread.sleep(3500);
 
             }
 //			ReceiveData=new String(newbuff);
@@ -311,14 +344,13 @@ public class MainActivity extends AppCompatActivity implements INaviInfoCallback
             Message msg=Message.obtain();
             msg.what=1;
             handler.sendMessage(msg);  //发送消息:系统会自动调用handleMessage( )方法来处理消息
-
         }
-
     }
     @Override
     protected void onDestroy() {
         // TODO Auto-generated method stub
         super.onDestroy();
+
 
         try {
             if(rThread!=null)
@@ -357,31 +389,79 @@ public class MainActivity extends AppCompatActivity implements INaviInfoCallback
     Runnable networkTask = new Runnable() {
         @Override
         public void run() {
-            try {
-                socket= new Socket(host, port);//注意host改成你服务器的hostname或IP地址
-                in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-                //send output msg
-                ((InitApplication)getApplication()).setSocket(socket);//首次初始化后赋值给全局
-                String outMsg = "TCP connecting to " + port + System.getProperty("line.separator");
-                out.write(outMsg);//发送数据
-                out.flush();
-                Log.i("TcpClient", "sent: " + outMsg);
-                //accept server response
-                String inMsg = in.readLine() + System.getProperty("line.separator");//得到服务器返回的数据
 
-                if (inMsg.length() > 0) {
-                    mKqwSpeechCompound.speaking("您已偏离盲道".trim());//目前只是为了检测到是不是能接受到数据
+                try {
+                    Socket socket = new Socket("10.20.89.177", 9002);
+                    System.out.println("客户端启动成功");
+                    //BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+                    PrintStream write = new PrintStream((socket.getOutputStream()));
+                    BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                    String info = "hello";
+//                    readline = br.readLine(); // 从系统标准输入读入一字符串
+                    //write.write(info);
+                    String inmsg = null;
+                    while (!info.equals("end")) {
+                        write.println(info);
+                        inmsg=in.readLine();
+                        write.flush();
+                        //Log.i("message",inmsg);
+
+                        if(inmsg!=null)
+                        {
+
+                            mKqwSpeechCompound.speaking("障碍物在前方".trim());
+
+                       }
+                       // else if(inmsg=="2")
+                       // {
+                       //     mKqwSpeechCompound.speaking("小心，前方有障碍".trim());
+                     //   }
+
+//
+                       // inmsg = in.readLine(); // 从系统标准输入读入一字符串
+                    } // 继续循环
+
+                    write.close(); // 关闭Socket输出流
+                    in.close(); // 关闭Socket输入流
+                    socket.close(); // 关闭Socket
+                } catch (Exception e) {
+                    try{
+                        mKqwSpeechCompound.speaking("摄像头已断开".trim());
+                        Thread.sleep(3500);
+                    }catch(Exception ae)
+                    {
+                        ae.printStackTrace();
+                    }
+                    System.out.println("can not listen to:" + e);// 出错，打印出错信息
+
+
                 }
-                Log.i("TcpClient", "received: " + inMsg);
-                //close connection
-               // socket.close();
-            } catch (UnknownHostException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
+                   /* socket = new Socket(host, port);//注意host改成你服务器的hostname或IP地址
+                    in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                    out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+                    //send output msg
+                    ((InitApplication) getApplication()).setSocket(socket);//首次初始化后赋值给全局
+                    String outMsg = "TCP connecting to " + port + System.getProperty("line.separator");
+                    out.write(outMsg);//发送数据
+                    out.flush();
+                    Log.i("TcpClient", "sent: " + outMsg);
+                    //accept server response
+                    String inMsg = in.readLine() + System.getProperty("line.separator");//得到服务器返回的数据
+
+
+                    if (inMsg.length() > 0) {
+                        mKqwSpeechCompound.speaking("您已偏离盲道".trim());//目前只是为了检测到是不是能接受到数据
+                    }
+                    Log.i("TcpClient", "received: " + inMsg);
+                    //close connection
+                    // socket.close();
+                } catch (UnknownHostException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }*/
             }
-        }
+
     };
 
     private void Speech() {
@@ -394,102 +474,6 @@ public class MainActivity extends AppCompatActivity implements INaviInfoCallback
         mGestureDetector.onTouchEvent(event);
         return super.onTouchEvent(event);
     }
-
-
-
-
-
-/*
-    public void onClick_Search(View view) {
-        setTitle("正在扫描...");
-        // 点击搜索周边设备，如果正在搜索，则暂停搜索
-        if (mBluetoothAdapter.isDiscovering()) {
-            mBluetoothAdapter.cancelDiscovery();
-        }
-        mBluetoothAdapter.startDiscovery();
-    }
-    // 注册广播接收者
-    private BroadcastReceiver receiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context arg0, Intent intent) {
-            // 获取到广播的action
-            String action = intent.getAction();
-            // 判断广播是搜索到设备还是搜索完成
-            if (action.equals(BluetoothDevice.ACTION_FOUND)) {
-                // 找到设备后获取其设备
-                BluetoothDevice device = intent
-                        .getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                // 判断这个设备是否是之前已经绑定过了，如果是则不需要添加，在程序初始化的时候已经添加了
-                if (device.getBondState() != BluetoothDevice.BOND_BONDED) {
-                    // 设备没有绑定过，则将其保持到arrayList集合中
-                    bluetoothDevices.add(device.getName() + ":"
-                            + device.getAddress() + "\n");
-                    // 更新字符串数组适配器，将内容显示在listView中
-                    arrayAdapter.notifyDataSetChanged();
-                }
-            } else if (action
-                    .equals(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)) {
-                setTitle("搜索完成");
-            }
-        }
-    };
-    // 创建handler，因为我们接收是采用线程来接收的，在线程中无法操作UI，所以需要handler
-    Handler handler = new Handler() {
-        @SuppressLint("WrongConstant")
-        @Override
-        public void handleMessage(Message msg) {
-            // TODO Auto-generated method stub
-            super.handleMessage(msg);
-            // 通过msg传递过来的信息，吐司一下收到的信息
-            Toast.makeText(MainActivity.this, (String) msg.obj, 0).show();
-        }
-    };
-    // 服务端接收信息线程
-    private class AcceptThread extends Thread {
-        private BluetoothServerSocket serverSocket;// 服务端接口
-        private BluetoothSocket socket;// 获取到客户端的接口
-        private InputStream is;// 获取到输入流
-        private OutputStream os;// 获取到输出流
-
-        public AcceptThread() {
-            try {
-                // 通过UUID监听请求，然后获取到对应的服务端接口
-                serverSocket = mBluetoothAdapter
-                        .listenUsingRfcommWithServiceRecord(NAME, MY_UUID);
-            } catch (Exception e) {
-                // TODO: handle exception
-            }
-        }
-
-        public void run() {
-            try {
-                // 接收其客户端的接口
-                socket = serverSocket.accept();
-                // 获取到输入流
-                is = socket.getInputStream();
-                // 获取到输出流
-                os = socket.getOutputStream();
-
-                // 无线循环来接收数据
-                while (true) {
-                    // 创建一个128字节的缓冲
-                    byte[] buffer = new byte[128];
-                    // 每次读取128字节，并保存其读取的角标
-                    int count = is.read(buffer);
-                    // 创建Message类，向handler发送数据
-                    Message msg = new Message();
-                    // 发送一个String的数据，让他向上转型为obj类型
-                    msg.obj = new String(buffer, 0, count, "utf-8");
-                    // 发送数据
-                    handler.sendMessage(msg);
-                }
-            } catch (Exception e) {
-                // TODO: handle exception
-                e.printStackTrace();
-            }
-        }
-    }
-*/
 
     public void onInitNaviFailure() {
 
@@ -539,51 +523,6 @@ public class MainActivity extends AppCompatActivity implements INaviInfoCallback
     public void onExitPage(int i) {
 
     }
-/*
-    @SuppressLint("WrongConstant")
-    @Override
-    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-// 获取到这个设备的信息
-        String s = arrayAdapter.getItem(position);
-        // 对其进行分割，获取到这个设备的地址
-        String address = s.substring(s.indexOf(":") + 1).trim();
-        // 判断当前是否还是正在搜索周边设备，如果是则暂停搜索
-        if (mBluetoothAdapter.isDiscovering()) {
-            mBluetoothAdapter.cancelDiscovery();
-        }
-        // 如果选择设备为空则代表还没有选择设备
-        if (selectDevice ==null ) {
-            //通过地址获取到该设备
-            selectDevice = mBluetoothAdapter.getRemoteDevice(address);
-        }
-        // 这里需要try catch一下，以防异常抛出
-        try {
-            // 判断客户端接口是否为空
-            if (clientSocket ==null ) {
-                // 获取到客户端接口
-                clientSocket = selectDevice
-                        .createRfcommSocketToServiceRecord(MY_UUID);
-                // 向服务端发送连接
-                clientSocket.connect();
-                // 获取到输出流，向外写数据
-                os = clientSocket.getOutputStream();
 
-            }
-            // 判断是否拿到输出流
-            if (os !=null) {
-                // 需要发送的信息
-                String text = "成功发送信息";
-                // 以utf-8的格式发送出去
-                os.write(text.getBytes("UTF-8"));
-            }
-            // 吐司一下，告诉用户发送成功
-            Toast.makeText(this, "发送信息成功，请查收", 0).show();
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-            // 如果发生异常则告诉用户发送失败
-            Toast.makeText(this, "发送信息失败", 0).show();
-        }
-    }*/
 }
 

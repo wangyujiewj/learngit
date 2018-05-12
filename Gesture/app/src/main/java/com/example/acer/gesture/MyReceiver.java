@@ -1,26 +1,39 @@
 package com.example.acer.gesture;
 
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.util.Log;
+
 import com.example.acer.gesture.CIsUtils;
 //蓝牙广播机制的接受
 public class MyReceiver extends BroadcastReceiver {
     String pin = "1234";  //此处为你要连接的蓝牙设备的初始密钥，一般为1234或0000
-
+    KqwSpeechCompound mKqwSpeechCompound;
+    private InitApplication mAppInstance;
     @Override
     public void onReceive(Context context, Intent intent) {
         // TODO: This method is called when the BroadcastReceiver is receiving
         // an Intent broadcast.
         // throw new UnsupportedOperationException("Not yet implemented");
         String action = intent.getAction(); //得到action
+         mAppInstance=(InitApplication)context; //返回应用的上下文
+
         Log.e("action1=", action);
         BluetoothDevice btDevice=null;  //创建一个蓝牙device对象
         // 从Intent中获取设备对象
         btDevice = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+        if(BluetoothAdapter.ACTION_STATE_CHANGED.equals(action))
+        {
+            int blueState = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1);
+            if(blueState==BluetoothAdapter.STATE_OFF)
+            {
+                mKqwSpeechCompound.speaking("蓝牙已断开");
 
+            }
+        }
         if(BluetoothDevice.ACTION_FOUND.equals(action)){  //发现设备
             Log.e("发现设备:", "["+btDevice.getName()+"]"+":"+btDevice.getAddress());
 
